@@ -3,7 +3,7 @@ import sys
 import time
 
 
-TIME_SLEEP = 10 * 60
+TIME_SLEEP = 5 * 60
 DELETE_UNTIL = 2592000
 
 
@@ -25,22 +25,28 @@ def parse_disk_list():
 
 
 def run_smartctl(list_disks, TIME_SLEEP):
+    result_disks = []
     for disk in list_disks:
+        result = int(os.popen('smartctl -a /dev/sda | grep "# 1" | tr -s " " | cut -f9 -d" "').read())
         os.popen('smartctl -t short "{}"'.format(disk))
         time.sleep(TIME_SLEEP)
+        result -= int(os.popen('smartctl -a /dev/sda | grep "# 1" | tr -s " " | cut -f9 -d" "').read())
+        if bool(result):
+            result_disks.append(disk)
+    return result_disks
 
 
 def delete_entries(DELETE_UNTIL):
     os.system('python "{}" "{}"'.format('delete_entry.py', time.time() - DELETE_UNTIL))
 
 
-def new_tests():
-    for disk in list_disks:
+def new_tests(result_disks):
+    for disk in result_disks:
         os.system('python "{}" "{}"'.format('HDD.py', disk))
 
 
 check_args()
 list_disks = parse_disk_list()
-run_smartctl(list_disks, TIME_SLEEP)
+result_disks = run_smartctl(list_disks, TIME_SLEEP)
 delete_entries(DELETE_UNTIL)
-new_tests()
+new_tests(result_disks)

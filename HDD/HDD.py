@@ -25,9 +25,9 @@ class Database(object):
                     testID INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     value INTEGER NOT NULL,
-                    thresh INTEGER NOT NULL,
+                    thresh TEXT NOT NULL,
                     type TEXT NOT NULL,
-                    raw_value INTEGER NOT NULL
+                    raw_value TEXT NOT NULL
                     )"""
         self.cursor.execute(sql_query)
 
@@ -94,9 +94,9 @@ class Parser(object):
                 (lastID,
                  cur_list[1],
                  int(cur_list[3]),
-                 int(cur_list[5]),
+                 cur_list[5],
                  cur_list[6],
-                 int(cur_list[-1]))
+                 cur_list[9])
             )
         return data_list
 
