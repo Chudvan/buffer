@@ -14,7 +14,7 @@ def check_args():
 
 
 def parse_disk_list():
-    list_disks = os.popen('fdisk -l | grep Disk\ /').read()
+    list_disks = os.popen('fdisk -l | grep \ /dev/').read()
     if not list_disks:
         print('Warning: empty list_disks.')
         print('Continue? (y/n)')
@@ -25,28 +25,22 @@ def parse_disk_list():
 
 
 def run_smartctl(list_disks, TIME_SLEEP):
-    result_disks = []
     for disk in list_disks:
-        result = int(os.popen('smartctl -a /dev/sda | grep "# 1" | tr -s " " | cut -f9 -d" "').read())
         os.popen('smartctl -t short "{}"'.format(disk))
         time.sleep(TIME_SLEEP)
-        result -= int(os.popen('smartctl -a /dev/sda | grep "# 1" | tr -s " " | cut -f9 -d" "').read())
-        if bool(result):
-            result_disks.append(disk)
-    return result_disks
 
 
 def delete_entries(DELETE_UNTIL):
     os.system('python "{}" "{}"'.format('delete_entry.py', time.time() - DELETE_UNTIL))
 
 
-def new_tests(result_disks):
-    for disk in result_disks:
+def new_tests():
+    for disk in list_disks:
         os.system('python "{}" "{}"'.format('HDD.py', disk))
 
 
 check_args()
 list_disks = parse_disk_list()
-result_disks = run_smartctl(list_disks, TIME_SLEEP)
+run_smartctl(list_disks, TIME_SLEEP)
 delete_entries(DELETE_UNTIL)
-new_tests(result_disks)
+new_tests()
