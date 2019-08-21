@@ -25,9 +25,9 @@ class Database(object):
                     testID INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     value INTEGER NOT NULL,
-                    thresh INTEGER NOT NULL,
+                    thresh TEXT NOT NULL,
                     type TEXT NOT NULL,
-                    raw_value INTEGER NOT NULL
+                    raw_value TEXT NOT NULL
                     )"""
         self.cursor.execute(sql_query)
 

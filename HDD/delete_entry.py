@@ -15,7 +15,7 @@ class Database(object):
             sql_query = """SELECT name FROM sqlite_master WHERE type='table' AND name='{}'""".format(table)
             self.cursor.execute(sql_query)
             if not len(self.cursor.fetchall()):
-                raise IOError("Error: '{}' table is not exist.".format(table))
+                return
         sql_query_1 = """SELECT uniqID 
                     FROM test WHERE unixtime < strftime('%s', '{}', 'unixepoch')
                     """.format(unix_time)
@@ -32,7 +32,8 @@ class Database(object):
                 self.cursor.execute(sql_query)
                 self.connection.commit()
         except sqlite3.OperationalError:
-            raise sqlite3.OperationalError("Error: can't make a request '{}'.".format(sql_query))
+            #raise sqlite3.OperationalError("Error: can't make a request '{}'.".format(sql_query))
+            print("Warning: can't make a request '{}'.".format(sql_query))
 
 
 def is_unix_time(unix_time):
