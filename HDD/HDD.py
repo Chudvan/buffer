@@ -55,7 +55,7 @@ class Database(object):
 class Parser(object):
     @staticmethod
     def parse_hdd_test(hdd):
-        unix_time = time.time()
+        unix_time = int(time.time())
         hdd_module = os.popen('smartctl -a "{}" | grep Device\ Model | tr -s " " | cut -f3,4 -d " "'.format(hdd)).read()
         if not hdd_module:
             print('Warning: hdd_module is empty.')
