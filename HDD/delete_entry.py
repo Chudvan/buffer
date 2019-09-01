@@ -39,9 +39,11 @@ class Database(object):
 def is_unix_time(unix_time):
     check = False
     try:
-        u_time = float(unix_time)
+        if len(unix_time) != 10:
+            return check
+        u_time = int(unix_time)
         if u_time < 0:
-            return False
+            return check
         datetime.datetime.fromtimestamp(u_time)
     except (ValueError, TypeError, OSError):
         return check
@@ -56,8 +58,8 @@ if len(sys.argv) == 2:
     unix_time = sys.argv[1]
     if not is_unix_time(unix_time):
         raise ValueError("""Error: Incorrect unixtime format.
-        Select number of seconds from 01.01.1970. 
-        Example: 1565964649.0689025""")
+        Select number of seconds from 01.01.1970. In format DDDDDDDDDD
+        Example: 1565964649""")
     db.delete_until(unix_time)
 elif len(sys.argv) <= 2:
     raise TypeError("""Error: Not enough arguments.
