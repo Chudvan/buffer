@@ -4,6 +4,7 @@ import sys
 import sqlite3
 import time
 
+NAME_DB = '/home/ufo/.UFO/var/hddsmart.sqlite3'
 
 class Database(object):
     def __init__(self, name_database):
@@ -117,7 +118,7 @@ if len(sys.argv) == 2:
     if not os.path.splitext(sys.argv[1])[1] == '.db':
         raise TypeError("""name_database must ends with '.db'""")
     '''
-    db = Database(name_db)
+    db = Database(NAME_DB)
     hdd_name = sys.argv[1]
     if not is_device(hdd_name):
         raise TypeError("""Device is not exists or it's not character special/block special""")

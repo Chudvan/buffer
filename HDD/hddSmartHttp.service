@@ -1,0 +1,16 @@
+[Unit]
+Description=HTTP server for hdd smart util
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=x11-up.service
+Conflicts=getty@tty12.service
+
+[Service]
+Type=idle
+EnvironmentFile=/etc/sysconfig/pos
+Environment=TERM=linux
+ExecStart=/usr/local/bin/menush -g -bl tty12 /usr/local/bin/hddSmartHttp.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

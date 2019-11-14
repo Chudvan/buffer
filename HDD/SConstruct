@@ -1,0 +1,32 @@
+# -*- coding: koi8-r -*-
+import os
+import ufopath
+import make
+ufodir=ufopath.ufodir
+
+Alias("all")
+Alias("install")
+Alias("install-local")
+
+vars={
+"PYTHON_MODULES":"HDD.py delete_entry.py hddSmartHttp.py",
+##############################################
+# Если нужно строить RPM, укажите файл спецификаций
+##############################################
+#"LIB_DIRS":(ufodir+"/victor/lib/ufomisc",
+#	    ufodir+"/victor/lib/intface",
+#	    ufodir+"/victor/backends/lib"),
+"SPEC_FILE":"hddSmart.spec",
+"SCRIPTS":"hddSmartHttp.sh",
+}
+env=Environment(ENV=os.environ)
+make.libpython(env,vars)
+make.install_file(env,"hddSmartHttp.service","/usr/lib/systemd/system")
+make.install_file_as(env,"hddSmartRun.py","/etc/cron.daily/hddSmartRun")
+
+
+env.AlwaysBuild("clean")
+env.Command("clean",None,[[make.sys.argv[0],"-c"]])
+
+Default("all")
+
