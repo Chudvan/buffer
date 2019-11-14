@@ -78,7 +78,7 @@ class XML:
         data_attrib.update({'type': 'REPLY'})
         data.attrib = data_attrib
         i = 0
-        test_columns = ['hddModule', 'testStatus', 'hddFilling', 'hddName', 'hddSerial']
+        test_columns = ['hddModule', 'testStatus', 'hddFilling', 'hddSysFilling', 'hddName', 'hddSerial']
         attr_columns = ['name', 'value', 'thresh', 'type', 'raw_value']
         for test in test_entries:
             hdd_test = xml.Element('HddTest')
