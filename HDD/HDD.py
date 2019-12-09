@@ -4,6 +4,7 @@ import sys
 import sqlite3
 import time
 
+NAME_DB = '/home/ufo/.UFO/var/hddsmart.sqlite3'
 
 class Database(object):
     def __init__(self, name_database):
@@ -16,6 +17,7 @@ class Database(object):
                     hddModule TEXT NOT NULL,
                     testStatus TEXT NOT NULL,
                     hddFilling TEXT NOT NULL,
+                    hddSysFilling TEXT NOT NULL,
                     hddName TEXT NOT NULL,
                     hddSerial TEXT NOT NULL
                     )"""
@@ -34,8 +36,8 @@ class Database(object):
     def put_in_database(self, table, data_list):
         sql_query = """INSERT INTO {} """.format(table)
         if table == 'test':
-            sql_query += """(unixtime, hddModule, testStatus, hddFilling, hddName, hddSerial)
-                         VALUES (?, ?, ?, ?, ?, ?)"""
+            sql_query += """(unixtime, hddModule, testStatus, hddFilling, hddSysFilling, hddName, hddSerial)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)"""
         elif table == 'attributes':
             sql_query += """(testID, name, value, thresh, type, raw_value)
                          VALUES (?, ?, ?, ?, ?, ?)"""
@@ -71,15 +73,21 @@ class Parser(object):
             status = u'Пройдена'
         else:
             print("Warning: Can't parse hdd test result.")
-        percent = os.popen('df -h / | grep /dev | cut -c 54-57').read()[:-1]
-        if not percent:
-            print("Warning: percent is empty.")
+        try:
+            hdd_filling = int(os.popen('df -x tmpfs -x devtmpfs -h --total \
+            | grep total | cut -c 54-57').read().split('%')[0])
+            hdd_sys_filling = int(os.popen('df -h / | grep /dev | cut -c 54-57').read().split('%')[0])
+        except ValueError:
+            print('Error: can\'t parse hdd_filling or hdd_sys_filling.')
+            hdd_filling = hdd_sys_filling = ''
+        if not hdd_sys_filling or not hdd_filling:
+            print("Warning: hdd_filling or hdd_sys_filling is empty.")
         hdd_serial = os.popen('smartctl -a "{}" | grep Serial\ Number'.format(hdd)).read()
         if not hdd_serial:
             print('Warning: hdd_serial is empty.')
         else:
             hdd_serial = hdd_serial.split()[-1]
-        return unix_time, hdd_module, status, percent, hdd, hdd_serial
+        return unix_time, hdd_module, status, hdd_filling, hdd_sys_filling, hdd, hdd_serial
 
     @staticmethod
     def parse_hdd_attributes(database, hdd):
@@ -117,7 +125,7 @@ if len(sys.argv) == 2:
     if not os.path.splitext(sys.argv[1])[1] == '.db':
         raise TypeError("""name_database must ends with '.db'""")
     '''
-    db = Database(name_db)
+    db = Database(NAME_DB)
     hdd_name = sys.argv[1]
     if not is_device(hdd_name):
         raise TypeError("""Device is not exists or it's not character special/block special""")

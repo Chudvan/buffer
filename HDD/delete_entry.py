@@ -3,6 +3,7 @@ import sys
 import sqlite3
 import datetime
 
+NAME_DB = '/home/ufo/.UFO/var/hddsmart.sqlite3'
 
 class Database(object):
     def __init__(self, name_database):
@@ -53,8 +54,7 @@ def is_unix_time(unix_time):
 
 
 if len(sys.argv) == 2:
-    name_db = 'database.db'
-    db = Database(name_db)
+    db = Database(NAME_DB)
     unix_time = sys.argv[1]
     if not is_unix_time(unix_time):
         raise ValueError("""Error: Incorrect unixtime format.

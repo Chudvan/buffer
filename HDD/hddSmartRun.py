@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: koi8-r -*-
+#
 import os
 import sys
 import time
@@ -32,21 +35,22 @@ def get_life_time(hdd):
 def run_smartctl(list_disks, TIME_SLEEP):
     for hdd in list_disks:
         cur_life_time = get_life_time(hdd)
-        start_time = time.time()
+        start_time = int(time.time())
         os.popen('smartctl -t short "{}"'.format(hdd))
-        while cur_life_time == get_life_time(hdd) and (time.time() - start_time) <= TIME_SLEEP:
+        while cur_life_time == get_life_time(hdd) and (int(time.time()) - start_time) <= TIME_SLEEP:
             time.sleep(5)
 
 
 def delete_entries(DELETE_UNTIL):
-    os.system('python "{}" "{}"'.format('delete_entry.py', time.time() - DELETE_UNTIL))
+    os.system('python "{}" "{}"'.format('/usr/local/share/ufo/python/delete_entry.pyc', int(time.time()) - DELETE_UNTIL))
 
 
 def new_tests(list_disks):
     for disk in list_disks:
-        os.system('python "{}" "{}"'.format('HDD.py', disk))
+        os.system('python "{}" "{}"'.format('/usr/local/share/ufo/python/HDD.pyc', disk))
 
 
+os.environ["PATH"] += os.pathsep + os.pathsep.join(["/usr/local/sbin","/usr/local/bin","/sbin","/bin","/usr/sbin","/usr/bin"])
 check_args()
 list_disks = parse_disk_list()
 run_smartctl(list_disks, TIME_SLEEP)
