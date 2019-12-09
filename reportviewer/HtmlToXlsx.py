@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from bs4 import BeautifulSoup
 import xlsxwriter
 import cssutils
+from PIL import Image
 
 """
 Parsing html with BeautifulSoup and cssutils and writing xlsx with xlsxwriter
@@ -59,14 +60,15 @@ def xl_height(style):
 def check_coordinates(merged, xl_row, xl_col):
     """Check if coordinates crossed already merged cells"""
     for merge in merged:
-                row_start = merge[0]
-                col_start = merge[1]
-                row_end = merge[2]
-                col_end = merge[3]
+        row_start = merge[0]
+        col_start = merge[1]
+        row_end = merge[2]
+        col_end = merge[3]
 
-                if row_start <= xl_row <= row_end:  # if we hit merged row
-                    if col_start <= xl_col <= col_end:  # if we hit column
-                        xl_col = col_end + 1  # then reposition next to it's end
+        if row_start <= xl_row <= row_end:  # if we hit merged row
+            if col_start <= xl_col <= col_end:  # if we hit column
+                xl_col = col_end + 1  # then reposition next to it's end
+                return check_coordinates(merged, xl_row, xl_col)
     return xl_row, xl_col
 
 
@@ -149,6 +151,9 @@ def transform(f_path, progress=None):
                 p = 1  # Prevent zero division
             i = 0
 
+        column_width = []
+        row_height = []
+
         # Now we will go through all tr
         for row in rows:
             xl_col = 0
@@ -161,12 +166,19 @@ def transform(f_path, progress=None):
                 for col in columns:
                     try:
                         width = xl_width(col["style"])
+                        column_width.append(width)
                         if width != 0:
                             worksheet.set_column(xl_col, xl_col, width)
                     except KeyError:
                         pass
                     xl_col += 1
                 continue  # skip to next row
+            elif not column_width:
+                columns = row.findChildren("td")
+
+                default_width = 8.43
+                for col in columns:
+                    column_width.append(default_width)
             # Get row settings from <tr> attributes
 
             # check for height
@@ -184,9 +196,11 @@ def transform(f_path, progress=None):
                     options = {"level": int(attrs["level"])-1}
 
             worksheet.set_row(xl_row, height, None, options)
+            row_height.append(height)
 
             cells = row.findChildren(["td", "th"])
             for cell in cells:
+                img_align = "left"
                 xl_row, xl_col = check_coordinates(merged, xl_row, xl_col)
 
                 # real value
@@ -235,6 +249,8 @@ def transform(f_path, progress=None):
                         if key == "text-align":
                             if val in ["left", "right", "center"]:
                                 cell_format.set_align(val)
+                                if val != "center":
+                                    img_align = val
 
                         elif key == "vertical-align":
                             if val in ["top", "middle", "bottom"]:
@@ -335,6 +351,67 @@ def transform(f_path, progress=None):
                     merged.append((xl_row, xl_col, xl_row + rowspan, xl_col + colspan))  # add merged cells to list
                 else:
                     worksheet.write(xl_row, xl_col, xl_val, cell_format)
+
+                images = cell.findChildren('img')
+                try:
+                    if images:
+                        sum_offset = 0
+                        max_height = 0
+                        sum_width = 0
+                        cell_width_px = sum(column_width[xl_col:xl_col + colspan + 1]) * 11.93
+                        if img_align == "right":
+                            images = images[::-1]
+                        for img in images:
+                            img_name = img.attrs['src']
+                            image = Image.open(img_name)
+                            real_width_px, real_height_px = image.size
+                            img_width_px = img_height_px = None
+                            x_scale = y_scale = 1
+                            try:
+                                img_width_px = float(img['width'])
+                                x_scale = img_width_px / real_width_px
+                            except (ValueError, KeyError):
+                                pass
+
+                            try:
+                                img_height_px = float(img['height'])
+                                y_scale = img_height_px / real_height_px
+                            except (ValueError, KeyError):
+                                pass
+
+                            if img_width_px is None:
+                                if img_height_px is None:
+                                    img_width_px = real_width_px
+                                    img_height_px = real_height_px
+                                else:
+                                    x_scale = y_scale
+                                    img_width_px = real_width_px * x_scale
+                            elif img_height_px is None:
+                                    y_scale = x_scale
+                                    img_height_px = real_height_px * y_scale
+
+                            sum_width += img_width_px
+                            if img_height_px > max_height:
+                                max_height = img_height_px
+                            x_offset = 0
+                            y_offset = 0
+                            if img_align == "left":
+                                x_offset += sum_offset
+                            elif img_align == "right":
+                                x_offset = cell_width_px - sum_offset - img_width_px
+
+                            worksheet.insert_image(xl_row, xl_col, img_name, {'x_offset': x_offset,
+                                                                              'y_offset': y_offset,
+                                                                              'x_scale': x_scale,
+                                                                              'y_scale': y_scale})
+                            sum_offset += img_width_px
+                        if sum_width > cell_width_px:
+                            worksheet.set_column(xl_col, xl_col, ((sum_width - cell_width_px) / 11.93 + column_width[xl_col]) * 1.7)
+                        cell_height_px = (row_height[xl_row] + rowspan * 15) / 0.7
+                        if max_height > cell_height_px:
+                            worksheet.set_row(xl_row, (max_height - cell_height_px) * 0.8 + row_height[xl_row], None, options)
+                except KeyError:
+                    pass
                 xl_col += 1
 
             if mode:
