@@ -7,7 +7,8 @@ from decimal import Decimal, InvalidOperation
 from bs4 import BeautifulSoup
 import xlsxwriter
 import cssutils
-from PIL import Image
+from PyQt4 import QtGui
+import os
 
 """
 Parsing html with BeautifulSoup and cssutils and writing xlsx with xlsxwriter
@@ -362,9 +363,16 @@ def transform(f_path, progress=None):
                         if img_align == "right":
                             images = images[::-1]
                         for img in images:
-                            img_name = img.attrs['src']
-                            image = Image.open(img_name)
-                            real_width_px, real_height_px = image.size
+                            if os.path.basename(img.attrs['src']) == img.attrs['src']:
+                                img_name = os.path.dirname(os.path.realpath(f_path)) + os.sep + os.path.basename(
+                                    img.attrs['src'])
+                            else:
+                                img_name = img.attrs['src']
+                            if not os.path.exists(img_name):
+                                continue
+                            image = QtGui.QImage()
+                            image.load(img_name)
+                            real_width_px, real_height_px = image.size().height(), image.size().width()
                             img_width_px = img_height_px = None
                             x_scale = y_scale = 1
                             try:
@@ -372,12 +380,16 @@ def transform(f_path, progress=None):
                                 x_scale = img_width_px / real_width_px
                             except (ValueError, KeyError):
                                 pass
+                            except ZeroDivisionError:
+                                continue
 
                             try:
                                 img_height_px = float(img['height'])
                                 y_scale = img_height_px / real_height_px
                             except (ValueError, KeyError):
                                 pass
+                            except ZeroDivisionError:
+                                continue
 
                             if img_width_px is None:
                                 if img_height_px is None:

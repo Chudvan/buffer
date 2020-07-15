@@ -15,8 +15,6 @@ import subprocess
 from PyQt4 import QtCore, QtGui, QtWebKit
 import HtmlToXlsx
 import rv_gui
-import time
-import traceback
 
 
 def standart_file_path(f_path):
@@ -136,7 +134,6 @@ def file_open(gui):
                 gui.tabWidget.setCurrentIndex(i)
                 break
         else:
-            print("f_path", f_path)
             gui.open_file(f_path)
             gui.file_list.append([f_path, ""])
             gui.tabWidget.setCurrentIndex(len(gui.file_list)-1)
@@ -167,7 +164,7 @@ class ControlMainWindow(QtGui.QMainWindow):
 
         self.tabWidget.tabCloseRequested.connect(self.close_handler)
 
-        ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + "/rep.ico"
+        ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
         self.setWindowIcon(QtGui.QIcon(ico_path))
 
         for file in self.file_list[1:]:
@@ -191,7 +188,7 @@ class ControlMainWindow(QtGui.QMainWindow):
         qWebView = QtWebKit.QWebView(qTab)
         verticalLayout = QtGui.QVBoxLayout(qTab)
         verticalLayout.addWidget(qWebView)
-        qWebView.setProperty("url", QtCore.QUrl(r"file:\\" + standart_file_path(f_page)))
+        qWebView.setProperty("url", QtCore.QUrl(standart_file_path(f_page)))
         qWebView.setObjectName(f_name)
 
     def close_handler(self, i):
