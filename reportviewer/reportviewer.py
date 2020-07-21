@@ -59,14 +59,14 @@ def excel(gui):
     """Transform html to excel and opens it"""
 
     mode = gui.file_list[0]
-    if mode:
+    if mode[0]:
         progress = start_progress(gui)
 
         cur_i = gui.tabWidget.currentIndex()
         f_path = gui.file_list[cur_i + 1]
 
         if f_path[1] == "":
-            xlsx = HtmlToXlsx.transform(f_path[0], progress)
+            xlsx = HtmlToXlsx.transform(f_path[0], progress=progress, need_password=mode[1])
             f_path[1] = xlsx
         else:
             xlsx = f_path[1]
@@ -82,7 +82,7 @@ def excel(gui):
         for f_path in gui.file_list[1:]:
             file = f_path[0]
             if f_path[1] == "":
-                xlsx = HtmlToXlsx.transform(file)
+                xlsx = HtmlToXlsx.transform(file, need_password=mode[1])
                 f_path[1] = xlsx
 
 
@@ -108,7 +108,7 @@ def e_mail(gui):
     progress = start_progress(gui)
 
     cur_i = gui.tabWidget.currentIndex()
-    f_path = gui.file_list[cur_i]
+    f_path = gui.file_list[cur_i + 1]
 
     if f_path[1] == "":
         xlsx = HtmlToXlsx.transform(f_path[0], progress)
@@ -131,12 +131,12 @@ def file_open(gui):
 
         for i in range(1, len(gui.file_list)):
             if gui.file_list[i][0] == f_path:
-                gui.tabWidget.setCurrentIndex(i)
+                gui.tabWidget.setCurrentIndex(i - 1)
                 break
         else:
             gui.open_file(f_path)
             gui.file_list.append([f_path, ""])
-            gui.tabWidget.setCurrentIndex(len(gui.file_list)-1)
+            gui.tabWidget.setCurrentIndex(len(gui.file_list) - 2)
 
 
 class ControlMainWindow(QtGui.QMainWindow):
@@ -145,7 +145,7 @@ class ControlMainWindow(QtGui.QMainWindow):
         mode = file_list[0]
         super(ControlMainWindow, self).__init__(parent)
         self.file_list = file_list
-        if not mode:
+        if not mode[0]:
             return
         self.ui = rv_gui.Ui_ReportViewer()
         self.ui.setupUi(self)
@@ -202,7 +202,7 @@ class ControlMainWindow(QtGui.QMainWindow):
 
         if reply == 0:
             self.tabWidget.removeTab(i)
-            self.file_list.pop(i)
+            self.file_list.pop(i + 1)
 
 
 def start_gui(file_list):
@@ -213,7 +213,7 @@ def start_gui(file_list):
             file_list[i] = [standart_file_path(os.path.realpath(file_list[i])), ""]
     app = QtGui.QApplication(sys.argv)
     mySW = ControlMainWindow(file_list=file_list)
-    if mode:
+    if mode[0]:
         mySW.show()
         sys.exit(app.exec_())
     else:
@@ -221,20 +221,41 @@ def start_gui(file_list):
 
 
 if __name__ == "__main__":
-    file_list = sys.argv[1:]
-    if not file_list:
-        file_list.append(True)
+    file_list = []
+    warning = False
+    if not sys.argv[1:]:
+        file_list.append((True, False))
     else:
-        mode = True if file_list[0].lower() == 'true' else False
-        if not mode and file_list[0].lower() != 'false':
+        mode_1 = True if sys.argv[1].lower() == 'true' else False
+        if not mode_1 and sys.argv[1].lower() != 'false':
             print("Warning: did you mean one of two modes: true or false?")
-        if not mode and not sys.argv[2:]:
-            print("Warning: empty file_list.\nUsage: python script.py \
-<mode: true/false> <path_to_html_1> <path_to_html_2>...")
-        file_list[0] = mode
+            warning = True
+        if not sys.argv[2:]:
+            file_list.append((mode_1, False))
+        else:
+            if sys.argv[2].lower() == 'true':
+                file_list.append((mode_1, True))
+                file_list += sys.argv[3:]
+            elif sys.argv[2].lower() == 'false':
+                file_list.append((mode_1, False))
+                file_list += sys.argv[3:]
+            else:
+                file_list.append((mode_1, False))
+                file_list += sys.argv[2:]
+        if not file_list[0][0] and not file_list[1:]:
+            print("Warning: empty file_list.")
+            warning = True
+        if warning:
+            print("Usage:")
+            print("1) python script.py")
+            print("2) python script.py <GUI: true/false> <path_to_html_1> <path_to_html_2>...")
+            print("3) python script.py <GUI: true/false> <password: true/false> <path_to_html_1> <path_to_html_2>...")
+
         try:
             save_last_dir(os.path.realpath(os.path.dirname(file_list[1])))
         except IndexError:
             pass
+
+    # print(file_list)
 
     start_gui(file_list)

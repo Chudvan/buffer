@@ -9,6 +9,7 @@ import xlsxwriter
 import cssutils
 from PyQt4 import QtGui
 import os
+import random
 
 """
 Parsing html with BeautifulSoup and cssutils and writing xlsx with xlsxwriter
@@ -73,9 +74,9 @@ def check_coordinates(merged, xl_row, xl_col):
     return xl_row, xl_col
 
 
-def transform(f_path, progress=None):
+def transform(f_path, progress=None, need_password=False):
     """Parse HTML and write XLSX"""
-    mode = True if progress else False
+    mode = (True if progress else False, True if need_password else False)
     c = 0
 
     if not is_html(f_path):
@@ -93,7 +94,7 @@ def transform(f_path, progress=None):
     with open(f_path, "r", encoding="utf-8") as html:
         soup = BeautifulSoup(html, "html.parser")
 
-    if mode:
+    if mode[0]:
         v = 20  # will be used in row iteration
         progress.setValue(v)
 
@@ -110,7 +111,13 @@ def transform(f_path, progress=None):
         worksheet = workbook.add_worksheet(name)
         # Default worksheet settings
         worksheet.set_landscape()
-        worksheet.outline_settings(False)
+        worksheet.outline_settings(True)
+
+        if need_password:
+            symbols = '123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM'
+            password = ''.join([random.choice(list(symbols)) for x in range(12)])
+
+            worksheet.protect(password)
 
         xl_row = 0
         xl_col = 0
@@ -145,7 +152,7 @@ def transform(f_path, progress=None):
 
         rows = table.findChildren("tr")
 
-        if mode:
+        if mode[0]:
             #  For progress bar
             p = round((len(rows)/80)*len(tables))
             if p == 0:
@@ -426,7 +433,7 @@ def transform(f_path, progress=None):
                     pass
                 xl_col += 1
 
-            if mode:
+            if mode[0]:
                 # Progress bar
                 i += 1
                 if i % p == 0:
