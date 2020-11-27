@@ -12,7 +12,9 @@ __author__ = "Serge"
 import sys
 import os
 import subprocess
-from PyQt4 import QtCore, QtGui, QtWebKit
+import win32com.client
+from PyQt5 import QtCore, QtGui, QtWebEngineWidgets, QtWidgets
+from PyQt5.QtPrintSupport import QPrintDialog, QPrinter
 import HtmlToXlsx
 import rv_gui
 
@@ -40,7 +42,7 @@ def get_last_dir():
 
 def start_progress(parent):
     """Create Qt Progress dialog and returns it"""
-    progress = QtGui.QProgressDialog(parent)
+    progress = QtWidgets.QProgressDialog(parent)
     progress.setCancelButton(None)
     progress.setWindowTitle(u"Обработка")
 
@@ -48,41 +50,61 @@ def start_progress(parent):
     progress.setValue(10)
 
     # Refresh gui
-    app = QtGui.QApplication.instance()
+    app = QtWidgets.QApplication.instance()
     app.processEvents()
 
     return progress
 
 # Buttons functions definitions
 
+
+def create_excel_with_progress(gui, path, need_password=False):
+    progress = start_progress(gui)
+    xlsx, status = HtmlToXlsx.transform(path, progress=progress, need_password=need_password)
+    progress.setValue(100)
+    progress.close()
+    return xlsx, status
+
+
 def excel(gui):
     """Transform html to excel and opens it"""
 
     mode = gui.file_list[0]
     if mode[0]:
-        progress = start_progress(gui)
-
         cur_i = gui.tabWidget.currentIndex()
-        f_path = gui.file_list[cur_i + 1]
+        if cur_i == -1:
+            return
 
+        f_path = gui.file_list[cur_i + 1]
         if f_path[1] == "":
-            xlsx = HtmlToXlsx.transform(f_path[0], progress=progress, need_password=mode[1])
+            xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
+            if not status:
+                return
             f_path[1] = xlsx
         else:
             xlsx = f_path[1]
-
-        progress.setValue(100)
-        progress.close()
+            if not os.path.exists(xlsx):
+                xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
+                if not status:
+                    return
 
         if sys.platform == "win32":
-            subprocess.Popen(["start", xlsx], shell=True)
+            if mode[2]:
+                com_object = win32com.client.Dispatch("Excel.Application")
+                workbook = com_object.Workbooks.Open(xlsx)
+                workbook.PrintOut()
+            else:
+                subprocess.Popen(["start", xlsx], shell=True)
         else:
             subprocess.Popen(["libreoffice " + xlsx], shell=True)
     else:
         for f_path in gui.file_list[1:]:
             file = f_path[0]
             if f_path[1] == "":
-                xlsx = HtmlToXlsx.transform(file, need_password=mode[1])
+                xlsx, status = HtmlToXlsx.transform(file, need_password=mode[1])
+                if not status:
+                    print(f"Файл {xlsx} занят другой программой")
+                    continue
                 f_path[1] = xlsx
 
 
@@ -90,34 +112,85 @@ def print_dialog(gui):
     """Open system printing dialog"""
 
     # Is it dirty?
+    if gui.tabWidget.currentWidget() is None:
+        return
     children = gui.tabWidget.currentWidget().children()
 
     for child in children:
-        if isinstance(child, QtWebKit.QWebView):
+        if isinstance(child, QtWebEngineWidgets.QWebEngineView):
             view = child
 
-    printer = QtGui.QPrinter(QtGui.QPrinter.HighResolution)
-    dialog = QtGui.QPrintDialog(printer)
-    if dialog.exec_() != QtGui.QDialog.Accepted:
-        return
-    view.print_(printer)
+    mode = gui.file_list[0]
+    if not mode[2]:
+        printer = QPrinter(QPrinter.HighResolution)
+        dialog = QPrintDialog(printer, view)
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+        loop = QtCore.QEventLoop()
+        result = False
+
+        def print_preview(success):
+            nonlocal result
+            result = success
+            loop.quit()
+
+        progressbar = QtWidgets.QProgressDialog(view)
+        progressbar.setWindowTitle("Печать")
+        progressbar.findChild(QtWidgets.QProgressBar).setTextVisible(False)
+        progressbar.setLabelText("Подождите. Идёт отправка файла на печать...")
+        progressbar.setRange(0, 0)
+        progressbar.show()
+        progressbar.canceled.connect(loop.quit)
+        page = view.page()
+        page.print(printer, print_preview)
+        loop.exec_()
+        progressbar.close()
+        if not result:
+            msg = QtWidgets.QMessageBox()
+            ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
+            msg.setWindowIcon(QtGui.QIcon(ico_path))
+            msg.setWindowTitle("Ошибка")
+            msg.setText(f"Ошибка печати.")
+            msg.setIcon(QtWidgets.QMessageBox.Critical)
+            msg.exec_()
+    else:
+        cur_i = gui.tabWidget.currentIndex()
+        f_path = gui.file_list[cur_i + 1]
+        if f_path[1] == "":
+            xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
+            if not status:
+                return
+            f_path[1] = xlsx
+        else:
+            xlsx = f_path[1]
+            if not os.path.exists(xlsx):
+                xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
+                if not status:
+                    return
+        com_object = win32com.client.Dispatch("Excel.Application")
+        workbook = com_object.Workbooks.Open(xlsx)
+        workbook.PrintOut()
 
 
 def e_mail(gui):
     """Open Outlook if win32 and attach something. Should I zip it?"""
-    progress = start_progress(gui)
-
     cur_i = gui.tabWidget.currentIndex()
+    if cur_i == -1:
+        return
+
     f_path = gui.file_list[cur_i + 1]
 
     if f_path[1] == "":
-        xlsx = HtmlToXlsx.transform(f_path[0], progress)
+        xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
+        if not status:
+            return
         f_path[1] = xlsx
     else:
         xlsx = f_path[1]
-
-    progress.setValue(100)
-    progress.close()
+        if not os.path.exists(xlsx):
+            xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
+            if not status:
+                return
 
     if sys.platform == "win32":
         subprocess.call(["start", "outlook.exe", "-a", xlsx], shell=True)
@@ -125,7 +198,10 @@ def e_mail(gui):
 
 def file_open(gui):
     """Open file and refresh browser"""
-    f_path = QtGui.QFileDialog.getOpenFileName(gui, directory=get_last_dir(), caption=u'Открыть файл', filter="*.html")
+    f_path = QtWidgets.QFileDialog.getOpenFileName(gui,
+                                                   directory=get_last_dir(),
+                                                   caption=u'Открыть файл',
+                                                   filter="*.html")[0]
     if f_path != "":
         save_last_dir(os.path.realpath(os.path.dirname(f_path)))
 
@@ -139,7 +215,7 @@ def file_open(gui):
             gui.tabWidget.setCurrentIndex(len(gui.file_list) - 2)
 
 
-class ControlMainWindow(QtGui.QMainWindow):
+class ControlMainWindow(QtWidgets.QMainWindow):
     """Wrapper to launch gui with my bindings, controls etc."""
     def __init__(self, parent=None, file_list=[]):
         mode = file_list[0]
@@ -155,9 +231,9 @@ class ControlMainWindow(QtGui.QMainWindow):
         self.ui.email.clicked.connect(lambda: e_mail(self))
         self.ui.fileopen.clicked.connect(lambda: file_open(self))
 
-        self.tabWidget = QtGui.QTabWidget(self.ui.centralwidget)
+        self.tabWidget = QtWidgets.QTabWidget(self.ui.centralwidget)
         self.tabWidget.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
-        self.tabWidget.setTabShape(QtGui.QTabWidget.Rounded)
+        self.tabWidget.setTabShape(QtWidgets.QTabWidget.Rounded)
         self.tabWidget.setTabsClosable(True)
         self.tabWidget.setObjectName("tabWidget")
         self.ui.verticalLayout_2.addWidget(self.tabWidget)
@@ -182,22 +258,22 @@ class ControlMainWindow(QtGui.QMainWindow):
         f_name = os.path.basename(f_path)
         f_name = os.path.splitext(f_name)[0]
 
-        qTab = QtGui.QWidget()
+        qTab = QtWidgets.QWidget()
 
         self.tabWidget.addTab(qTab, (f_name))
-        qWebView = QtWebKit.QWebView(qTab)
-        verticalLayout = QtGui.QVBoxLayout(qTab)
+        qWebView = QtWebEngineWidgets.QWebEngineView(qTab)
+        verticalLayout = QtWidgets.QVBoxLayout(qTab)
         verticalLayout.addWidget(qWebView)
         qWebView.setProperty("url", QtCore.QUrl(standart_file_path(f_page)))
         qWebView.setObjectName(f_name)
 
     def close_handler(self, i):
         """Close tab with dialog"""
-        message = QtGui.QMessageBox()
+        message = QtWidgets.QMessageBox()
         message.setText(u"Вы уверены, что хотите закрыть вкладку?")
         message.setWindowTitle(u"Внимание")
-        message.addButton(QtGui.QPushButton(u'Да'), QtGui.QMessageBox.YesRole)
-        message.addButton(QtGui.QPushButton(u'Нет'), QtGui.QMessageBox.NoRole)
+        message.addButton(QtWidgets.QPushButton(u'Да'), QtWidgets.QMessageBox.YesRole)
+        message.addButton(QtWidgets.QPushButton(u'Нет'), QtWidgets.QMessageBox.NoRole)
         reply = message.exec_()
 
         if reply == 0:
@@ -211,7 +287,7 @@ def start_gui(file_list):
     for i in range(1, len(file_list)):
         if file_list[i] != "":
             file_list[i] = [standart_file_path(os.path.realpath(file_list[i])), ""]
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     mySW = ControlMainWindow(file_list=file_list)
     if mode[0]:
         mySW.show()
@@ -220,42 +296,51 @@ def start_gui(file_list):
         excel(mySW)
 
 
+def usage(script_name):
+    print("Usage:")
+    print(f"1) python {script_name}")
+    print(f"2) python {script_name} <GUI: true/false> <path_to_html_1> <path_to_html_2>...")
+    print(f"3) python {script_name} <GUI: true/false> <password: true/false> <path_to_html_1> <path_to_html_2>...")
+    print(f"4) python {script_name} <GUI: true/false> <password: true/false> <silent: "
+          f"true/false> <path_to_html_1> <path_to_html_2>...")
+
+
 if __name__ == "__main__":
     file_list = []
-    warning = False
+    mode = []
+    default_mode = (True, False, False)
     if not sys.argv[1:]:
-        file_list.append((True, False))
+        file_list.append(default_mode)
     else:
-        mode_1 = True if sys.argv[1].lower() == 'true' else False
-        if not mode_1 and sys.argv[1].lower() != 'false':
-            print("Warning: did you mean one of two modes: true or false?")
-            warning = True
-        if not sys.argv[2:]:
-            file_list.append((mode_1, False))
+        if sys.argv[1].lower() == "true":
+            mode.append(True)
+        elif sys.argv[1].lower() == "false":
+            mode.append(False)
         else:
-            if sys.argv[2].lower() == 'true':
-                file_list.append((mode_1, True))
-                file_list += sys.argv[3:]
-            elif sys.argv[2].lower() == 'false':
-                file_list.append((mode_1, False))
-                file_list += sys.argv[3:]
+            print(f"Error: You have tried python {sys.argv[0]} {' '.join(sys.argv[1:])}")
+            usage(sys.argv[0])
+            sys.exit(-1)
+        if not sys.argv[2:]:
+            file_list.append(tuple(mode) + default_mode[1:])
+        else:
+            for i, arg in enumerate(sys.argv[2:]):
+                if sys.argv[2:][i].lower() == "true":
+                    mode.append(True)
+                elif sys.argv[2:][i].lower() == "false":
+                    mode.append(False)
+                else:
+                    file_list.append(tuple(mode) + default_mode[i + 1:])
+                    file_list += sys.argv[2:][i:]
+                    break
             else:
-                file_list.append((mode_1, False))
-                file_list += sys.argv[2:]
-        if not file_list[0][0] and not file_list[1:]:
-            print("Warning: empty file_list.")
-            warning = True
-        if warning:
-            print("Usage:")
-            print("1) python script.py")
-            print("2) python script.py <GUI: true/false> <path_to_html_1> <path_to_html_2>...")
-            print("3) python script.py <GUI: true/false> <password: true/false> <path_to_html_1> <path_to_html_2>...")
-
-        try:
-            save_last_dir(os.path.realpath(os.path.dirname(file_list[1])))
-        except IndexError:
-            pass
-
-    # print(file_list)
+                i = len(sys.argv[2:])
+                file_list.append(tuple(mode) + default_mode[i + 1:])
+                file_list += sys.argv[2:][i:]
+    if not file_list[0][0] and not file_list[1:]:
+        print("Warning: empty file_list.")
+        usage(sys.argv[0])
+        sys.exit(-1)
+    if file_list[1:]:
+        save_last_dir(os.path.realpath(os.path.dirname(file_list[1])))
 
     start_gui(file_list)

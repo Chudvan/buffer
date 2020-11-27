@@ -7,7 +7,8 @@ from decimal import Decimal, InvalidOperation
 from bs4 import BeautifulSoup
 import xlsxwriter
 import cssutils
-from PyQt4 import QtGui
+import sys
+from PyQt5 import QtGui, QtWidgets
 import os
 import random
 
@@ -147,8 +148,8 @@ def transform(f_path, progress=None, need_password=False):
                     worksheet.fit_to_pages(1, 0)
 
             elif attr == "outline_below":
-                if attrs["outline_below"].lower() == "true":
-                    worksheet.outline_settings(True)
+                if attrs["outline_below"].lower() == "false":
+                    worksheet.outline_settings(True, False, True, False)
 
         rows = table.findChildren("tr")
 
@@ -443,5 +444,18 @@ def transform(f_path, progress=None, need_password=False):
             xl_row += 1
 
     # close excel
-    workbook.close()
-    return f_xlsx
+
+    status = True
+
+    try:
+        workbook.close()
+    except xlsxwriter.exceptions.FileCreateError:
+        msg = QtWidgets.QMessageBox()
+        ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
+        msg.setWindowIcon(QtGui.QIcon(ico_path))
+        msg.setWindowTitle("Внимание")
+        msg.setText(f"Файл {f_xlsx} занят другой программой")
+        msg.setIcon(QtWidgets.QMessageBox.Critical)
+        msg.exec_()
+        status = False
+    return f_xlsx, status
