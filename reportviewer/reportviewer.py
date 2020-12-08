@@ -13,6 +13,7 @@ import sys
 import os
 import subprocess
 import win32com.client
+from pywintypes import com_error
 from PyQt5 import QtCore, QtGui, QtWebEngineWidgets, QtWidgets
 from PyQt5.QtPrintSupport import QPrintDialog, QPrinter
 import HtmlToXlsx
@@ -66,6 +67,16 @@ def create_excel_with_progress(gui, path, need_password=False):
     return xlsx, status
 
 
+def create_messagebox(title, text, icon):
+    msg = QtWidgets.QMessageBox()
+    ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
+    msg.setWindowIcon(QtGui.QIcon(ico_path))
+    msg.setWindowTitle(title)
+    msg.setText(text)
+    msg.setIcon(icon)
+    msg.exec_()
+
+
 def excel(gui):
     """Transform html to excel and opens it"""
 
@@ -90,9 +101,15 @@ def excel(gui):
 
         if sys.platform == "win32":
             if mode[2]:
-                com_object = win32com.client.Dispatch("Excel.Application")
-                workbook = com_object.Workbooks.Open(xlsx)
-                workbook.PrintOut()
+                try:
+                    com_object = win32com.client.Dispatch("Excel.Application")
+                    workbook = com_object.Workbooks.Open(xlsx)
+                    workbook.PrintOut()
+                except com_error:
+                    title = "Внимание"
+                    text = "На данном компьютере не установлен Excel."
+                    icon = QtWidgets.QMessageBox.Warning
+                    create_messagebox(title, text, icon)
             else:
                 subprocess.Popen(["start", xlsx], shell=True)
         else:
@@ -146,13 +163,10 @@ def print_dialog(gui):
         loop.exec_()
         progressbar.close()
         if not result:
-            msg = QtWidgets.QMessageBox()
-            ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
-            msg.setWindowIcon(QtGui.QIcon(ico_path))
-            msg.setWindowTitle("Ошибка")
-            msg.setText(f"Ошибка печати.")
-            msg.setIcon(QtWidgets.QMessageBox.Critical)
-            msg.exec_()
+            title = "Ошибка"
+            text = "Ошибка печати."
+            icon = QtWidgets.QMessageBox.Critical
+            create_messagebox(title, text, icon)
     else:
         cur_i = gui.tabWidget.currentIndex()
         f_path = gui.file_list[cur_i + 1]
@@ -167,9 +181,15 @@ def print_dialog(gui):
                 xlsx, status = create_excel_with_progress(gui, f_path[0], need_password=mode[1])
                 if not status:
                     return
-        com_object = win32com.client.Dispatch("Excel.Application")
-        workbook = com_object.Workbooks.Open(xlsx)
-        workbook.PrintOut()
+        try:
+            com_object = win32com.client.Dispatch("Excel.Application")
+            workbook = com_object.Workbooks.Open(xlsx)
+            workbook.PrintOut()
+        except com_error:
+            title = "Внимание"
+            text = "На данном компьютере не установлен Excel."
+            icon = QtWidgets.QMessageBox.Warning
+            create_messagebox(title, text, icon)
 
 
 def e_mail(gui):

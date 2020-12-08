@@ -75,6 +75,16 @@ def check_coordinates(merged, xl_row, xl_col):
     return xl_row, xl_col
 
 
+def create_messagebox(title, text, icon):
+    msg = QtWidgets.QMessageBox()
+    ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
+    msg.setWindowIcon(QtGui.QIcon(ico_path))
+    msg.setWindowTitle(title)
+    msg.setText(text)
+    msg.setIcon(icon)
+    msg.exec_()
+
+
 def transform(f_path, progress=None, need_password=False):
     """Parse HTML and write XLSX"""
     mode = (True if progress else False, True if need_password else False)
@@ -450,12 +460,9 @@ def transform(f_path, progress=None, need_password=False):
     try:
         workbook.close()
     except xlsxwriter.exceptions.FileCreateError:
-        msg = QtWidgets.QMessageBox()
-        ico_path = os.path.dirname(os.path.realpath(sys.argv[0])) + os.sep + "rep.png"
-        msg.setWindowIcon(QtGui.QIcon(ico_path))
-        msg.setWindowTitle("Внимание")
-        msg.setText(f"Файл {f_xlsx} занят другой программой")
-        msg.setIcon(QtWidgets.QMessageBox.Critical)
-        msg.exec_()
+        title = "Внимание"
+        text = f"Файл {f_xlsx} занят другой программой"
+        icon = QtWidgets.QMessageBox.Critical
+        create_messagebox(title, text, icon)
         status = False
     return f_xlsx, status
