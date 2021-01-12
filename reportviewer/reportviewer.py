@@ -100,18 +100,7 @@ def excel(gui):
                     return
 
         if sys.platform == "win32":
-            if mode[2]:
-                try:
-                    com_object = win32com.client.Dispatch("Excel.Application")
-                    workbook = com_object.Workbooks.Open(xlsx)
-                    workbook.PrintOut()
-                except com_error:
-                    title = "Внимание"
-                    text = "На данном компьютере не установлен Excel."
-                    icon = QtWidgets.QMessageBox.Warning
-                    create_messagebox(title, text, icon)
-            else:
-                subprocess.Popen(["start", xlsx], shell=True)
+            subprocess.Popen(["start", xlsx], shell=True)
         else:
             subprocess.Popen(["libreoffice " + xlsx], shell=True)
     else:
@@ -139,17 +128,33 @@ def print_dialog(gui):
 
     mode = gui.file_list[0]
     if not mode[2]:
-        printer = QPrinter(QPrinter.HighResolution)
-        dialog = QPrintDialog(printer, view)
+
+        class PrinterHandler(object):
+            def __init__(self):
+                self.loop = QtCore.QEventLoop()
+                self.printer = QPrinter(QPrinter.HighResolution)
+                self.result = False
+
+            def cancel(self):
+                xpsStr = "Microsoft XPS Document Writer"
+                if self.printer.printerName() == xpsStr and not self.result:
+                    title = "Внимание"
+                    text = "Выбран принтер Microsoft XPS Document Writer. Отменить печать невозможно."
+                    icon = QtWidgets.QMessageBox.Critical
+                    create_messagebox(title, text, icon)
+                    return
+                self.loop.quit()
+
+        printerHandler = PrinterHandler()
+        dialog = QPrintDialog(printerHandler.printer, view)
         if dialog.exec_() != QtWidgets.QDialog.Accepted:
             return
-        loop = QtCore.QEventLoop()
         result = False
 
         def print_preview(success):
             nonlocal result
             result = success
-            loop.quit()
+            printerHandler.loop.quit()
 
         progressbar = QtWidgets.QProgressDialog(view)
         progressbar.setWindowTitle("Печать")
@@ -157,15 +162,22 @@ def print_dialog(gui):
         progressbar.setLabelText("Подождите. Идёт отправка файла на печать...")
         progressbar.setRange(0, 0)
         progressbar.show()
-        progressbar.canceled.connect(loop.quit)
+        progressbar.canceled.connect(printerHandler.cancel)
         page = view.page()
-        page.print(printer, print_preview)
-        loop.exec_()
-        progressbar.close()
+        page.print(printerHandler.printer, print_preview)
+        printerHandler.loop.exec_()
         if not result:
+            # NEED TO: progressbar закрывается?
             title = "Ошибка"
             text = "Ошибка печати."
             icon = QtWidgets.QMessageBox.Critical
+            create_messagebox(title, text, icon)
+        else:
+            printerHandler.result = True
+            progressbar.close()
+            title = "Печать"
+            text = "Файл отправлен на печать."
+            icon = QtWidgets.QMessageBox.Information
             create_messagebox(title, text, icon)
     else:
         cur_i = gui.tabWidget.currentIndex()
@@ -189,6 +201,11 @@ def print_dialog(gui):
             title = "Внимание"
             text = "На данном компьютере не установлен Excel."
             icon = QtWidgets.QMessageBox.Warning
+            create_messagebox(title, text, icon)
+        else:
+            title = "Печать"
+            text = "Файл отправлен на печать."
+            icon = QtWidgets.QMessageBox.Information
             create_messagebox(title, text, icon)
 
 
